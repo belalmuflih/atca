@@ -3,11 +3,9 @@ import json
 import os
 import requests
 import base64
-
-
-sandbox_compliance_url = (
-    "https://gw-fatoora.zatca.gov.sa/e-invoicing/developer-portal/compliance"
-)
+from . import schema
+from .constants.endpoints import URLs
+from colorama import Fore
 
 
 def create_parser():
@@ -27,7 +25,7 @@ def create_parser():
     return parser
 
 
-def test_csr(csr_path="./taxpayer.csr"):
+def test_csr(csr_path="./keys/taxpayer.csr") -> schema.SandboxTestCSR | None:
     with open(csr_path) as f:
         csr = f.read()
     headers = {
@@ -43,24 +41,27 @@ def test_csr(csr_path="./taxpayer.csr"):
     }
 
     response = requests.post(
-        sandbox_compliance_url,
+        URLs.sandbox_compliance,
         headers=headers,
         json=json_data,
     )
-
+    text = f"{Fore.RED}Invalid CSR.{Fore.RESET}"
     if response.status_code == 200:
-        text = "CSR has passed the compliance test."
-        print(text)
+        text = f"{Fore.GREEN}Valid CSR.{Fore.RESET}"
         response_json = response.json()
-        with open("CSID.json", "w") as f:
+        with open("keys/CSID.json", "w") as f:
             json.dump(response_json, f, indent=4)
+        with open("keys/cert.txt", "w") as f:
+            cert = base64.b64decode(response_json['binarySecurityToken']).decode()
+            f.write(cert)
+    print(text)
 
 
 def create_csr():
-    os.system("openssl ecparam -name secp256k1 -genkey -noout -out PrivateKey.pem")
-    os.system("openssl ec -in PrivateKey.pem -pubout -out publickey.pem")
+    os.system("openssl ecparam -name secp256k1 -genkey -noout -out keys/PrivateKey.pem")
+    os.system("openssl ec -in keys/PrivateKey.pem -pubout -out keys/publickey.pem")
     os.system(
-        "openssl req -new -sha256 -key PrivateKey.pem -extensions v3_req -config Configuration.cnf -out taxpayer.csr"
+        "openssl req -new -sha256 -key keys/PrivateKey.pem -extensions v3_req -config Configuration.cnf -out keys/taxpayer.csr"
     )
 
 
